@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import random
+from PIL import ImageTk, Image
 
 # region STYLESHEET CONFIGURATION (Tailwind-like Dark Theme)
 BG_DARK = '#1f2937' 
@@ -11,7 +12,8 @@ ACCENT_INDIGO = '#6366f1'
 #region INITIALIZATION
 root = tk.Tk()
 root.title("Math Quiz")
-root.geometry("400x600")
+root.geometry("700x600")
+root.iconphoto(False, ImageTk.PhotoImage(file="Assessment 1 - Skills Portfolio/01-MathsQuiz/assets/icon.ico"))
 
 
 #endregion INITIALIZATION
