@@ -2,10 +2,18 @@ import tkinter as tk
 from tkinter import ttk
 import random
 
+# region STYLESHEET CONFIGURATION (Tailwind-like Dark Theme)
+BG_DARK = '#1f2937' 
+BG_MEDIUM = '#374151' 
+FG_LIGHT = '#f3f4f6' 
+ACCENT_INDIGO = '#6366f1' 
+
 #region INITIALIZATION
 root = tk.Tk()
 root.title("Math Quiz")
-root.geometry("800x600")
+root.geometry("400x600")
+
+
 #endregion INITIALIZATION
 
 #region STATE VARIABLES
@@ -38,7 +46,7 @@ def select_hard():
 def decide_operation():
     return random.choice(OPERATORS)
 
-def generate_number(difficulty):
+def random_int(difficulty):
     # Using random.randint(a, b) includes both endpoints
     if difficulty == "easy":
         # Two-digit + Single-digit
@@ -91,6 +99,20 @@ def start_quiz():
     # Start the first question
     next_question()
 
+def grade_quiz(score, total):
+    result = score/total
+
+    if result >= 0.9:
+        return "A"
+    elif result >= 0.7:
+        return "B"
+    elif result >= 0.5:
+        return "C"
+    elif result >= 0.3:
+        return "D"
+    else:
+        return "F"
+
 def next_question():
     """Generates, displays the next question, and stores the correct answer."""
     global current_answer, current_question_count
@@ -99,7 +121,8 @@ def next_question():
     
     if current_question_count >= TOTAL_QUESTIONS:
         # Game over logic
-        question_label.config(text=f"Quiz Over! Final Score: {score}/{TOTAL_QUESTIONS}")
+        grade = grade_quiz(score, TOTAL_QUESTIONS)
+        question_label.config(text=f"Quiz Over! Final Score: {score}/{TOTAL_QUESTIONS} Grade: {grade}")
         answer_entry.grid_forget()
         submit_button.grid_forget()
         menu_return.grid(row=4, column=0, columnspan=3, pady=20) # Show menu return
@@ -108,7 +131,7 @@ def next_question():
     current_question_count += 1
     
     # 1. Generate Numbers and Operation
-    num_pair = generate_number(difficulty)
+    num_pair = random_int(difficulty)
     num1, num2 = num_pair[0], num_pair[1]
     op = decide_operation()
 
@@ -155,8 +178,8 @@ def check_answer():
     except ValueError:
         feedback_label.config(text="Please enter a valid number.", foreground="orange")
 
-#REGION SELECTORS
-def diff_select():
+#SELECTORS
+def display_menu():
     """Shows the difficulty selection frame."""
     # Clear previous frames and set up diff selector
     ingame_frame.grid_forget()
@@ -176,10 +199,48 @@ def men_ret():
 
 #region STYLESHEET
 style = ttk.Style()
+style.theme_use('clam')
 
-style.configure("Diff.TLabel", font=('Arial', 20))
-style.configure("Title.TLabel", font=('Arial', 48, "bold"))
-style.configure("Question.TLabel", font=('Arial', 24, "bold"))
+# General Styles
+style.configure('TFrame', background=BG_DARK)
+style.configure('TLabel', background=BG_DARK, foreground=FG_LIGHT)
+
+# Titles and Accent Labels
+style.configure("Title.TLabel", font=('Arial', 48, "bold"), foreground=ACCENT_INDIGO)
+style.configure("Diff.TLabel", font=('Arial', 20), foreground=ACCENT_INDIGO)
+style.configure("Question.TLabel", font=('Arial', 28, "bold"), foreground=FG_LIGHT)
+
+# Buttons
+style.configure('TButton',
+    font=('Arial', 14, 'bold'),
+    foreground='white',
+    background=ACCENT_INDIGO,
+    borderwidth=0,
+    relief='flat',
+    padding=15
+)
+# Map: Change appearance when button is pressed or active (hovered)
+style.map('TButton',
+    background=[('active', '#4f46e5'), ('pressed', '#4f46e5')],
+    foreground=[('active', 'white')]
+)
+
+# Custom color styles for feedback
+style.configure("Success.TLabel", background=BG_DARK, foreground="lightgreen", font=('Arial', 14))
+style.configure("Error.TLabel", background=BG_DARK, foreground="tomato", font=('Arial', 14))
+
+# Custom style for selected difficulty button
+style.configure('Selected.TButton',
+    background=ACCENT_INDIGO, 
+    foreground='white', 
+    borderwidth=3,
+    relief='solid',
+    bordercolor='white'
+)
+style.map('Selected.TButton',
+    background=[('active', '#4f46e5'), ('pressed', '#4f46e5')],
+    foreground=[('active', 'white')]
+)
 
 #endregion STYLESHEET
 
@@ -204,11 +265,11 @@ menu_frame.grid(row=0, column=0, sticky="nsew")
 #region menu 
 title = ttk.Label(menu_frame, text="MATH QUIZ", style="Title.TLabel")
 title.grid(row=0, column=0, pady=(100, 30))
-menu_play = ttk.Button(menu_frame, text="Play!", command=diff_select)
+menu_play = ttk.Button(menu_frame, text="Play!", command=display_menu)
 menu_play.grid(row=1, column=0, pady=10)
 #endregion menu
 
-#region difficulty IMPLEMENTING SUB-FRAMES HERE
+#region difficulty
 
 # 1. Sub-frames defined within difficulty_frame
 diff_label_frame = ttk.Frame(difficulty_frame)
