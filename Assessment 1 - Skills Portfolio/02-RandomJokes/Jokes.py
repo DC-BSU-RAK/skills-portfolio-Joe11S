@@ -13,7 +13,7 @@ root.geometry("800x600")
 def get_random_joke():
     """Read randomJokes.txt, extract a random joke, and separate Q & A."""
     try:
-        with open("Assessment 1 - Skills Portfolio/A1 - Resources/randomJokes.txt", "r") as file:
+        with open("Assessment 1 - Skills Portfolio/02-RandomJokes/randomJokes.txt", "r") as file:
             content = file.read()
     except FileNotFoundError:
         return ("Error: Joke file not found.", "")
