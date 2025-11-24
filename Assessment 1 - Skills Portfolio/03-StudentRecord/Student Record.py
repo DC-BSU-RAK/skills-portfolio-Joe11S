@@ -119,10 +119,10 @@ class DataRepository:
 # --- 3. Tkinter GUI Application ---
 
 class StudentApp(tk.Tk):
-    """The main Tkinter GUI application."""
+    # The main Tkinter GUI application.
     def __init__(self):
         super().__init__()
-        self.title("🎓 Student Manager (JSON Edition)")
+        self.title("🎓 Student Manager")
         self.geometry("700x550")
         
         # Load the data via the repository
@@ -195,7 +195,7 @@ class StudentApp(tk.Tk):
         self._update_display("Welcome to the Student Manager.\nSelect a row in the table above to view the detailed record.")
 
     def _create_menu(self):
-        """Creates the main menubar with required options and a new Edit menu."""
+        # Creates the main menubar with required options and a new Edit menu.
         menubar = tk.Menu(self)
         self.config(menu=menubar)
 
@@ -217,7 +217,7 @@ class StudentApp(tk.Tk):
         menubar.add_command(label="Exit", command=self.quit)
 
     def _populate_treeview(self, student_list):
-        """Fills the Treeview widget with student data."""
+        # Fills the Treeview widget with student data.
         # Clear existing data
         for item in self.student_tree.get_children():
             self.student_tree.delete(item)
@@ -239,7 +239,7 @@ class StudentApp(tk.Tk):
                                      ))
 
     def _filter_student_list(self, filter_text):
-        """Filters the Treeview based on text input (implements the interactive search)."""
+        #Filters the Treeview based on text input (implements the interactive search).
         search_term = filter_text.lower()
         
         if not search_term:
@@ -255,7 +255,7 @@ class StudentApp(tk.Tk):
 
 
     def _on_treeview_select(self, event):
-        """Handles Treeview selection (implements Menu Item 2: View individual student record)."""
+        #Handles Treeview selection (implements Menu Item 2: View individual student record).
         selected_item = self.student_tree.focus()
         if not selected_item:
             return
@@ -267,7 +267,7 @@ class StudentApp(tk.Tk):
             # Find the corresponding student object using the code
             student = next(s for s in self.students if s.code == student_code)
             
-            output = f"## 2. Individual Student Record (Selected)\n\n"
+            output = f"Individual Student Record\n\n"
             output += student.get_display_data()
             self._update_display(output)
             
@@ -275,7 +275,7 @@ class StudentApp(tk.Tk):
             self._update_display(f"Error: Could not find student with code {student_code}.")
 
     def _update_display(self, content):
-        """Clears and updates the ScrolledText display."""
+        # Clears and updates the ScrolledText display.
         self.display_area.config(state=tk.NORMAL)
         self.display_area.delete('1.0', tk.END)
         self.display_area.insert(tk.END, content)
@@ -284,12 +284,12 @@ class StudentApp(tk.Tk):
     # --- Menu Item Handlers ---
     
     def _view_all_records(self):
-        """Handles Menu Item 1: View all student records."""
+        # Handles Menu Item 1: View all student records.
         # Reload the data to ensure we use the latest files
         self.students = self.repository._load_data()
         self._populate_treeview(self.students) # Update the table
         
-        output = "## 1. All Student Records\n\n"
+        output = "All Student Records\n\n"
         
         # Calculate summary statistics
         total_percentage = reduce(lambda acc, s: acc + s.overall_percentage, self.students, 0)
@@ -309,7 +309,7 @@ class StudentApp(tk.Tk):
         self._update_display(output)
 
     def _show_highest_scorer(self):
-        """Handles Menu Item 3: Show student with highest total score."""
+        # Handles Menu Item 3: Show student with highest total score.
         if not self.students: return
 
         highest_scorer = max(self.students, key=lambda s: s.total_score)
@@ -326,7 +326,7 @@ class StudentApp(tk.Tk):
 
 
     def _show_lowest_scorer(self):
-        """Handles Menu Item 4: Show student with lowest total score."""
+        # Handles Menu Item 4: Show student with lowest total score.
         if not self.students: return
 
         lowest_scorer = min(self.students, key=lambda s: s.total_score)
@@ -341,7 +341,7 @@ class StudentApp(tk.Tk):
         self.student_tree.selection_set(lowest_scorer.code)
         self.student_tree.focus(lowest_scorer.code)
 
-
+# Run App
 if __name__ == "__main__":
     app = StudentApp()
     if app.winfo_exists():
