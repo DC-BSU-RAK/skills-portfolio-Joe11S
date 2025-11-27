@@ -5,7 +5,7 @@ import os
 import pathlib
 from functools import reduce
 
-# --- 1. Student Class and Constants ---
+# --- Student and Data Repository ---
 
 class Student:
     """Represents a single student record and handles calculations."""
@@ -16,34 +16,22 @@ class Student:
     def __init__(self, code, name, coursework_marks, exam_mark):
         self.code = str(code)
         self.name = name
-        # Ensure marks are integers, necessary for calculations
         self.coursework_marks = [int(m) for m in coursework_marks] 
         self.exam_mark = int(exam_mark)
-        
         self.total_coursework = sum(self.coursework_marks)
         self.total_score = self.total_coursework + self.exam_mark
-        
-        # Calculation: percentage is based on the potential total of 160 marks.
         self.overall_percentage = (self.total_score / self.MAX_TOTAL) * 100
         self.grade = self._calculate_grade()
 
     def _calculate_grade(self):
-        """Calculates the student's grade based on the overall percentage."""
         perc = self.overall_percentage
-        # Grading scale: A for 70%+, B for 60%-69%, C for 50%-59%, D for 40%-49%, F for under 40%
-        if perc >= 70:
-            return 'A'
-        elif perc >= 60:
-            return 'B'
-        elif perc >= 50:
-            return 'C'
-        elif perc >= 40:
-            return 'D'
-        else:
-            return 'F'
+        if perc >= 70: return 'A'
+        elif perc >= 60: return 'B'
+        elif perc >= 50: return 'C'
+        elif perc >= 40: return 'D'
+        else: return 'F'
 
     def get_display_data(self):
-        """Returns a formatted string of the student's results."""
         return (
             f"Name: {self.name}\n"
             f"Student Number: {self.code}\n"
@@ -55,7 +43,6 @@ class Student:
         )
     
     def to_dict(self):
-        """Converts student data back to a dictionary for JSON saving."""
         return {
             "code": self.code,
             "name": self.name,
@@ -63,19 +50,15 @@ class Student:
             "exam_mark": self.exam_mark
         }
 
-# --- 2. Data Repository ---
-
 class DataRepository:
     """Handles loading and persistence of student data using JSON files."""
-    # NOTE: Using user's provided path, please ensure this path is correct.
     DATA_FOLDER = "Assessment 1 - Skills Portfolio/03-StudentRecord/data" 
 
     def __init__(self):
-        pathlib.Path(self.DATA_FOLDER).mkdir(exist_ok=True) # Ensure the data folder exists
+        pathlib.Path(self.DATA_FOLDER).mkdir(exist_ok=True)
         self.students = self._load_data()
 
     def _load_data(self):
-        """Reads all JSON files in the data folder and returns a list of Student objects."""
         students = []
         for filename in os.listdir(self.DATA_FOLDER):
             if filename.endswith(".json"):
@@ -94,17 +77,25 @@ class DataRepository:
                     print(f"Error loading {filename}: {e}")
         return students
 
-    def save_student(self, student):
-        """Saves a single Student object as a new or updated JSON file."""
-        filepath = os.path.join(self.DATA_FOLDER, f"{student.name}.json")
+    def save_student(self, student, original_name=None):
+        new_filepath = os.path.join(self.DATA_FOLDER, f"{student.name}.json")
+        
+        if original_name and original_name != student.name:
+            old_filepath = os.path.join(self.DATA_FOLDER, f"{original_name}.json")
+            if os.path.exists(old_filepath):
+                try:
+                    os.remove(old_filepath)
+                except Exception as e:
+                    messagebox.showerror("Rename Error", f"Could not delete old file ({original_name}.json): {e}")
+                    return False
+
         try:
-            # Check for name/file conflicts before saving
-            if os.path.exists(filepath):
+            if not original_name and os.path.exists(new_filepath):
                  if not messagebox.askyesno("Confirm Overwrite", 
                                              f"A record for '{student.name}' already exists. Overwrite?"):
                     return False
                     
-            with open(filepath, 'w') as f:
+            with open(new_filepath, 'w') as f:
                 json.dump(student.to_dict(), f, indent=4)
             return True
         except Exception as e:
@@ -112,7 +103,6 @@ class DataRepository:
             return False
             
     def delete_student(self, student_name):
-        """Deletes a student's JSON file."""
         filepath = os.path.join(self.DATA_FOLDER, f"{student_name}.json")
         if os.path.exists(filepath):
             try:
@@ -123,14 +113,18 @@ class DataRepository:
                 return False
         return False
 
-# --- 3. Tkinter GUI Application ---
+# --- Application ---
 
 class StudentApp(tk.Tk):
     """The main Tkinter GUI application."""
     def __init__(self):
         super().__init__()
-        self.title("🎓 Student Manager (Data CRUD Enabled)")
+        self.title("🎓 Student Manager (CRUD & Sorting Enabled)")
         self.geometry("700x550")
+        
+        # Track the current sort state for the Treeview
+        self.sort_column = 'name'
+        self.sort_reverse = False
         
         # Load the data via the repository
         self.repository = DataRepository()
@@ -161,8 +155,8 @@ class StudentApp(tk.Tk):
         tree_frame.pack(fill='both', expand=False, padx=10, pady=(5, 5))
         
         # Define Columns for the Treeview
-        columns = ('code', 'name', 'coursework_total', 'exam_mark', 'overall_perc', 'grade')
-        self.student_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', height=10)
+        self.columns = ('code', 'name', 'coursework_total', 'exam_mark', 'overall_perc', 'grade')
+        self.student_tree = ttk.Treeview(tree_frame, columns=self.columns, show='headings', height=10)
 
         # Configure Headings and Column Widths
         self.student_tree.heading('code', text='Code', anchor=tk.W)
@@ -186,8 +180,12 @@ class StudentApp(tk.Tk):
         
         self.student_tree.pack(side='left', fill='both', expand=True)
         
-        # Bind Selection Event to trigger Menu Item 2 functionality
+        # Bind Selection and Sorting Events
         self.student_tree.bind('<<TreeviewSelect>>', self._on_treeview_select)
+        
+        # BINDING FOR COLUMN SORTING
+        for col in self.columns:
+            self.student_tree.heading(col, command=lambda c=col: self._sort_column(c))
         
         # --- Bottom Frame: Detailed Output Area ---
         tk.Label(self, text="Detailed Record Output:", anchor='w').pack(fill='x', padx=10, pady=(5, 0))
@@ -196,7 +194,7 @@ class StudentApp(tk.Tk):
         self.display_area.pack(expand=True, fill="both", padx=10, pady=10)
         self.display_area.config(state=tk.DISABLED)
         
-        # Populate the table on startup
+        # Populate the table on startup (Initial sort by name ascending)
         self._populate_treeview(self.students)
         self._update_display("Welcome to the Student Manager.\nSelect a row in the table above to view the detailed record.")
 
@@ -205,22 +203,60 @@ class StudentApp(tk.Tk):
         menubar = tk.Menu(self)
         self.config(menu=menubar)
 
-        # Actions Menu (Original Requirements)
+        # Actions Menu (Original Requirements 1, 3, 4)
         actions_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Actions", menu=actions_menu)
 
-        actions_menu.add_command(label="1. View All Student Records (Detailed)", command=self._view_all_records)
+        actions_menu.add_command(label="View All Student Records", command=self._view_all_records)
         actions_menu.add_separator()
-        actions_menu.add_command(label="3. Show Highest Scorer", command=self._show_highest_scorer)
-        actions_menu.add_command(label="4. Show Lowest Scorer", command=self._show_lowest_scorer)
+        actions_menu.add_command(label="Show Highest Scorer", command=self._show_highest_scorer)
+        actions_menu.add_command(label="Show Lowest Scorer", command=self._show_lowest_scorer)
         
-        # Edit Menu (For Add/Remove Scalability)
+        # Edit Menu (CRUD Operations)
         edit_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Edit", menu=edit_menu)
-        edit_menu.add_command(label="Add New Student", command=self._add_student_dialog)
-        edit_menu.add_command(label="Delete Selected Student", command=self._delete_selected_student)
+        edit_menu.add_command(label="Add Record", command=lambda: self._data_entry_dialog(mode='Add'))
+        edit_menu.add_command(label="Edit Record", command=self._edit_selected_record)
+        edit_menu.add_command(label="Delete Record", command=self._delete_selected_student)
 
         menubar.add_command(label="Exit", command=self.quit)
+        
+    def _sort_column(self, col):
+        """Handles the logic for sorting the Treeview by the selected column."""
+        
+        # 1. Determine sort direction
+        # If the same column is clicked, toggle the direction
+        if col == self.sort_column:
+            self.sort_reverse = not self.sort_reverse
+        else:
+            # If a new column is clicked, set the new column and default to ascending (False)
+            self.sort_column = col
+            self.sort_reverse = False
+            
+        # 2. Get the items and sort them
+        data = [(self.student_tree.set(k, col), k) for k in self.student_tree.get_children('')]
+        
+        # Determine the key conversion based on the column type for accurate sorting
+        if col in ('code', 'coursework_total', 'exam_mark'):
+            data.sort(key=lambda t: int(t[0]), reverse=self.sort_reverse)
+        elif col in ('overall_perc'):
+            # Strip the '%' and convert to float
+            data.sort(key=lambda t: float(t[0].strip('%')), reverse=self.sort_reverse)
+        else: # Default: sort by string (name, grade)
+            data.sort(key=lambda t: t[0].lower(), reverse=self.sort_reverse)
+
+        # 3. Rearrange the items in the Treeview
+        for index, (val, k) in enumerate(data):
+            self.student_tree.move(k, '', index)
+
+        # 4. Update the heading visual indicator (optional but helpful)
+        for c in self.columns:
+            self.student_tree.heading(c, text=self.student_tree.heading(c, 'text').replace(' ▲', '').replace(' ▼', ''))
+        
+        arrow = ' ▼' if self.sort_reverse else ' ▲'
+        current_text = self.student_tree.heading(col, 'text')
+        self.student_tree.heading(col, text=current_text + arrow)
+
 
     def _populate_treeview(self, student_list):
         """Fills the Treeview widget with student data."""
@@ -228,7 +264,7 @@ class StudentApp(tk.Tk):
         for item in self.student_tree.get_children():
             self.student_tree.delete(item)
 
-        # Sort students by name for organized display
+        # Sort students initially by name before populating the Treeview
         sorted_students = sorted(student_list, key=lambda s: s.name)
         
         for student in sorted_students:
@@ -243,7 +279,19 @@ class StudentApp(tk.Tk):
                                          f"{student.overall_percentage:.2f}%",
                                          student.grade
                                      ))
+        
+        # Reapply current sort state if it exists (e.g., after filter/reload)
+        if self.students:
+            self._sort_column(self.sort_column)
 
+
+    # --- Utility and Display Methods (CRUD and Menu Handlers remain the same) ---
+    # (The rest of the class methods, including _filter_student_list, _on_treeview_select, 
+    # _validate_marks, _data_entry_dialog, _edit_selected_record, _delete_selected_student, 
+    # and the Menu Handlers, remain the same as the previous full working solution.)
+    
+    # ... (Rest of the StudentApp class code below) ...
+    
     def _filter_student_list(self, filter_text):
         """Filters the Treeview based on text input (implements the interactive search)."""
         search_term = filter_text.lower()
@@ -266,14 +314,12 @@ class StudentApp(tk.Tk):
         if not selected_item:
             return
 
-        # The iid of the item is the student code
         student_code = selected_item
         
         try:
-            # Find the corresponding student object using the code
             student = next(s for s in self.students if s.code == student_code)
             
-            output = f"## 2. Individual Student Record (Selected)\n\n"
+            output = f"## Individual Student Record (Selected)\n\n"
             output += student.get_display_data()
             self._update_display(output)
             
@@ -287,20 +333,38 @@ class StudentApp(tk.Tk):
         self.display_area.insert(tk.END, content)
         self.display_area.config(state=tk.DISABLED)
         
-    # --- CRUD Implementation Methods ---
+    # --- Data Management (CRUD) Implementation ---
 
-    def _validate_marks(self, marks):
-        """Helper to validate that all marks are valid integers within their maximum range."""
+    def _get_selected_student(self):
+        """Retrieves the Student object selected in the Treeview."""
+        selected_item = self.student_tree.focus()
+        if not selected_item:
+            messagebox.showwarning("Selection Error", "Please select a student from the table first.")
+            return None
+        
+        student_code = selected_item
         try:
-            # Check Code (1000-9999) and Name length are not empty
+            return next(s for s in self.students if s.code == student_code)
+        except StopIteration:
+            messagebox.showerror("Error", "Selected student record not found in memory.")
+            return None
+
+    def _validate_marks(self, marks, mode, original_code=None):
+        """Helper to validate data input."""
+        try:
             if not marks['code'].strip() or not marks['name'].strip():
                 messagebox.showerror("Input Error", "Student Code and Name cannot be empty.")
                 return False
             
-            code = int(marks['code'])
-            if not (1000 <= code <= 9999):
+            code = str(marks['code'])
+            if not (1000 <= int(code) <= 9999):
                  messagebox.showerror("Input Error", "Student Code must be between 1000 and 9999.")
                  return False
+
+            if mode == 'Add' or (mode == 'Edit' and code != original_code):
+                if any(s.code == code for s in self.students):
+                    messagebox.showerror("Input Error", f"Student code {code} already exists.")
+                    return False
 
             cw1 = int(marks['cw1']); cw2 = int(marks['cw2']); cw3 = int(marks['cw3'])
             exam = int(marks['exam'])
@@ -318,81 +382,97 @@ class StudentApp(tk.Tk):
             messagebox.showerror("Input Error", "Marks and Code must be valid numbers.")
             return False
 
-    def _add_student_dialog(self):
-        """Opens a dialog window to capture new student data."""
+    def _data_entry_dialog(self, mode='Add', student_data=None):
+        """Opens a dialog window for adding or editing student data."""
         dialog = tk.Toplevel(self)
-        dialog.title("Add New Student")
+        dialog.title(f"{mode} Student Record")
         dialog.geometry("350x350")
         dialog.transient(self) 
         dialog.grab_set() 
         
+        original_student_index = -1
+        original_name = None
+        original_code = None
+        
+        if mode == 'Edit' and student_data:
+            original_name = student_data.name
+            original_code = student_data.code
+            try:
+                original_student_index = self.students.index(student_data)
+            except ValueError:
+                pass 
+
         input_fields = [
-            ("Student Code (1000-9999):", "code"),
-            ("Name:", "name"),
-            ("Coursework 1 (Max 20):", "cw1"),
-            ("Coursework 2 (Max 20):", "cw2"),
-            ("Coursework 3 (Max 20):", "cw3"),
-            ("Exam Mark (Max 100):", "exam")
+            ("Student Code (1000-9999):", "code", original_code if mode == 'Edit' else ""),
+            ("Name:", "name", original_name if mode == 'Edit' else ""),
+            ("Coursework 1 (Max 20):", "cw1", student_data.coursework_marks[0] if mode == 'Edit' else ""),
+            ("Coursework 2 (Max 20):", "cw2", student_data.coursework_marks[1] if mode == 'Edit' else ""),
+            ("Coursework 3 (Max 20):", "cw3", student_data.coursework_marks[2] if mode == 'Edit' else ""),
+            ("Exam Mark (Max 100):", "exam", student_data.exam_mark if mode == 'Edit' else "")
         ]
         entries = {}
         
         # Create labels and entry fields
-        for i, (label_text, key) in enumerate(input_fields):
+        for i, (label_text, key, default_value) in enumerate(input_fields):
             tk.Label(dialog, text=label_text, anchor='w').grid(row=i, column=0, padx=5, pady=5, sticky='w')
             entry = tk.Entry(dialog)
+            entry.insert(0, default_value)
+            
+            if mode == 'Edit' and key == 'code':
+                entry.config(state=tk.DISABLED) 
             entry.grid(row=i, column=1, padx=5, pady=5, sticky='ew')
             entries[key] = entry
 
-        def save_new_student():
+        def save_record():
             """Gathers data, validates it, saves the JSON, and updates the GUI."""
             marks = {key: entry.get() for key, entry in entries.items()}
             
-            if not self._validate_marks(marks):
+            if mode == 'Edit':
+                marks['code'] = original_code
+
+            if not self._validate_marks(marks, mode, original_code):
                 return
             
-            # Check for unique code
-            if any(s.code == marks['code'] for s in self.students):
-                messagebox.showerror("Input Error", f"Student code {marks['code']} already exists.")
-                return
-
             try:
-                # Create Student object
-                new_student = Student(
+                temp_student = Student(
                     code=marks['code'],
                     name=marks['name'],
                     coursework_marks=[marks['cw1'], marks['cw2'], marks['cw3']],
                     exam_mark=marks['exam']
                 )
 
-                # Save to disk
-                if self.repository.save_student(new_student):
-                    # Update in-memory list and GUI
-                    self.students.append(new_student)
-                    self._filter_student_list(self.filter_var.get()) # Refresh treeview with current filter
-                    self._update_display(f"Successfully added and saved: {new_student.name}")
+                if self.repository.save_student(temp_student, original_name=original_name):
+                    
+                    if mode == 'Add':
+                        self.students.append(temp_student)
+                        msg = f"Successfully added and saved: {temp_student.name}"
+                    
+                    elif mode == 'Edit':
+                        self.students[original_student_index] = temp_student
+                        msg = f"Successfully updated and saved: {temp_student.name}"
+                        
+                    self._populate_treeview(self.students) # Full refresh to include sort changes
+                    self._update_display(msg)
                     dialog.destroy()
                 
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to add student: {e}")
+                messagebox.showerror("Error", f"Failed to process student: {e}")
 
-        tk.Button(dialog, text="Save Student", command=save_new_student, bg="green", fg="white").grid(
+        tk.Button(dialog, text=f"Save Record", command=save_record, bg="green", fg="white").grid(
             row=len(input_fields), column=0, columnspan=2, pady=10)
-        dialog.columnconfigure(1, weight=1) # Make entry field expandable
+        dialog.columnconfigure(1, weight=1) 
+
+    def _edit_selected_record(self):
+        """Prepares data for the _data_entry_dialog in Edit mode."""
+        student_to_edit = self._get_selected_student()
+        if student_to_edit:
+            self._data_entry_dialog(mode='Edit', student_data=student_to_edit)
 
     def _delete_selected_student(self):
         """Deletes the selected student record from the GUI and filesystem."""
-        selected_item = self.student_tree.focus()
-        if not selected_item:
-            messagebox.showwarning("Selection Error", "Please select a student from the table to delete.")
-            return
-            
-        student_code = selected_item
-        
-        try:
-            student_to_delete = next(s for s in self.students if s.code == student_code)
-        except StopIteration:
-            messagebox.showerror("Error", "Student record not found in memory.")
-            return
+        student_to_delete = self._get_selected_student()
+        if not student_to_delete:
+            return 
 
         confirm = messagebox.askyesno(
             "Confirm Deletion",
@@ -400,38 +480,22 @@ class StudentApp(tk.Tk):
         )
         
         if confirm:
-            # 1. Delete the JSON file from the repository
             if self.repository.delete_student(student_to_delete.name):
-                
-                # 2. Remove from the in-memory list
                 self.students.remove(student_to_delete)
-                
-                # 3. Remove from the Treeview (GUI)
-                self.student_tree.delete(selected_item)
-                
+                self.student_tree.delete(student_to_delete.code)
                 self._update_display(f"✅ Successfully deleted record for: {student_to_delete.name}")
-            else:
-                # Error already shown by repository.delete_student
-                pass 
 
-    # --- Menu Item Handlers (Unchanged logic for 1, 3, 4) ---
-    
     def _view_all_records(self):
         """Handles Menu Item 1: View all student records."""
-        # Reload the data to ensure we use the latest files
         self.students = self.repository._load_data()
-        self._populate_treeview(self.students) # Update the table
+        self._populate_treeview(self.students) 
         
         output = "All Student Records\n\n"
-        
-        # Calculate summary statistics
         total_percentage = reduce(lambda acc, s: acc + s.overall_percentage, self.students, 0)
         
-        # Output detailed records
         for student in self.students:
             output += student.get_display_data() + "\n"
             
-        # Summary Statistics
         num_students = len(self.students)
         avg_percentage = total_percentage / num_students if num_students > 0 else 0
         
@@ -446,14 +510,11 @@ class StudentApp(tk.Tk):
         if not self.students: return
 
         highest_scorer = max(self.students, key=lambda s: s.total_score)
-        
         output = "## 3. Student with Highest Total Score\n\n"
         output += f"🥇 **Highest Score Achieved: {highest_scorer.total_score} / {Student.MAX_TOTAL}**\n\n"
         output += highest_scorer.get_display_data()
-        
         self._update_display(output)
         
-        # Highlight the student in the table
         self.student_tree.selection_set(highest_scorer.code)
         self.student_tree.focus(highest_scorer.code)
 
@@ -463,14 +524,11 @@ class StudentApp(tk.Tk):
         if not self.students: return
 
         lowest_scorer = min(self.students, key=lambda s: s.total_score)
-        
         output = "## 4. Student with Lowest Total Score\n\n"
         output += f"⬇️ **Lowest Score Achieved: {lowest_scorer.total_score} / {Student.MAX_TOTAL}**\n\n"
         output += lowest_scorer.get_display_data()
-        
         self._update_display(output)
 
-        # Highlight the student in the table
         self.student_tree.selection_set(lowest_scorer.code)
         self.student_tree.focus(lowest_scorer.code)
 
